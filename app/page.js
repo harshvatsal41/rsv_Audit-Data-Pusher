@@ -13,6 +13,7 @@ export default function Home() {
   const [allBatches, setAllBatches] = useState([]);
   const [batchList, setBatchList] = useState([]);
   const [apiCalled, setApiCalled] = useState(false);
+  const [apiCalledsingle, setApiCalledsingle] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [editSrNo, setEditSrNo] = useState(null);
@@ -327,6 +328,7 @@ export default function Home() {
      CREATE ITEM (Single)
   ------------------------------------------------------------ */
   const createItem = async () => {
+    setApiCalledsingle(true);
     // Required fields validation
     const requiredFields = ['product_id', 'Batch_no', 'Quantity', 'Location', 'vendor_id'];
     const missingFields = requiredFields.filter(field => !form[field]);
@@ -351,6 +353,8 @@ export default function Home() {
     } catch (error) {
       console.error("Error creating item:", error);
       alert("Error creating item. Please try again.");
+    } finally {
+      setApiCalledsingle(false);
     }
   };
 
@@ -454,6 +458,18 @@ export default function Home() {
      UPDATE ITEM
   ------------------------------------------------------------ */
   const updateItem = async () => {
+    setApiCalledsingle(true);
+
+    // Add validation for update as well
+    const requiredFields = ['product_id', 'Batch_no', 'Quantity', 'Location', 'vendor_id'];
+    const missingFields = requiredFields.filter(field => !form[field]);
+
+    if (missingFields.length > 0) {
+      alert(`Please fill in all required fields: ${missingFields.join(', ')}`);
+      setApiCalledsingle(false); // Reset if validation fails
+      return;
+    }
+
     try {
       await fetch(API_URL, {
         method: "POST",
@@ -467,6 +483,8 @@ export default function Home() {
     } catch (error) {
       console.error("Error updating item:", error);
       alert("Error updating item. Please try again.");
+    } finally {
+      setApiCalledsingle(false);
     }
   };
 
@@ -599,241 +617,8 @@ export default function Home() {
         <div className="grid lg:grid-cols-1 gap-8">
           {/* Form Section */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Single Item Form */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
-                  {editSrNo ? "Edit Item" : "Add Single Item"}
-                </h2>
-                {editSrNo && (
-                  <button
-                    onClick={resetForm}
-                    className="px-3 py-1 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white border border-slate-300 dark:border-slate-600 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
 
-              <div className="space-y-4">
-                {/* Location */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Location *
-                  </label>
-                  <input
-                    name="Location"
-                    value={form.Location || ""}
-                    onChange={handleChange}
-                    placeholder="Enter location"
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
 
-                {/* Product Selection with Search */}
-                <div className="relative">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Product *
-                  </label>
-                  <input
-                    type="text"
-                    value={productSearch}
-                    onChange={(e) => {
-                      setProductSearch(e.target.value);
-                      setShowProductDropdown(true);
-                    }}
-                    onFocus={() => setShowProductDropdown(true)}
-                    placeholder="Search or select product"
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-
-                  {showProductDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {filteredProducts.map((product) => (
-                        <div
-                          key={product["Product ID"]}
-                          onClick={() => handleProductSelect(product["Product ID"], product.Product)}
-                          className="p-3 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer border-b border-slate-200 dark:border-slate-600 last:border-b-0"
-                        >
-                          <div className="font-medium text-slate-900 dark:text-white">
-                            {product.Product}
-                          </div>
-                          <div className="text-sm text-slate-500 dark:text-slate-400">
-                            {product["Product ID"]}
-                          </div>
-                        </div>
-                      ))}
-                      {filteredProducts.length === 0 && (
-                        <div className="p-3 text-slate-500 dark:text-slate-400 text-center">
-                          No products found
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Batch Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Batch No *
-                  </label>
-                  <select
-                    name="Batch_no"
-                    value={form.Batch_no || ""}
-                    onChange={(e) => handleBatchSelect(e.target.value)}
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    disabled={batchLoading || !form.product_id}
-                  >
-                    <option value="">
-                      {batchLoading ? "Loading batches..." : !form.product_id ? "Select product first" : "Select Batch"}
-                    </option>
-                    {batchList.map((b, i) => {
-                      const batchKey = b.dATA_ID || b.Batch;
-                      const displayName = b.dATA_ID ? `BATCH_${b.dATA_ID}` : b.Batch;
-                      return (
-                        <option key={i} value={batchKey}>
-                          {displayName} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-
-                {/* Input Grid - Changed expiryDate to text type */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Quantity *
-                    </label>
-                    <input
-                      type="number"
-                      name="Quantity"
-                      value={form.Quantity || ""}
-                      onChange={handleChange}
-                      placeholder="Quantity"
-                      className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Expiry Date
-                    </label>
-                    <input
-                      type="text"
-                      name="expiryDate"
-                      value={form.expiryDate || ""}
-                      onChange={handleChange}
-                      placeholder="Expiry Date"
-                      className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      MRP
-                    </label>
-                    <input
-                      type="number"
-                      name="MRP"
-                      value={form.MRP || ""}
-                      onChange={handleChange}
-                      placeholder="MRP"
-                      className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Unit Price
-                    </label>
-                    <input
-                      type="number"
-                      name="Unit_Price"
-                      value={form.Unit_Price || ""}
-                      onChange={handleChange}
-                      placeholder="Unit Price"
-                      className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Vendor Selection with Search */}
-                <div className="relative">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Vendor *
-                  </label>
-                  <input
-                    type="text"
-                    value={vendorSearch}
-                    onChange={(e) => {
-                      setVendorSearch(e.target.value);
-                      setShowVendorDropdown(true);
-                    }}
-                    onFocus={() => setShowVendorDropdown(true)}
-                    placeholder="Search or select vendor"
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-
-                  {showVendorDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {filteredVendors.map((vendor) => (
-                        <div
-                          key={vendor._id}
-                          onClick={() => handleVendorSelect(vendor._id, vendor.partyName)}
-                          className="p-3 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer border-b border-slate-200 dark:border-slate-600 last:border-b-0"
-                        >
-                          <div className="font-medium text-slate-900 dark:text-white">
-                            {vendor.partyName}
-                          </div>
-                        </div>
-                      ))}
-                      {filteredVendors.length === 0 && (
-                        <div className="p-3 text-slate-500 dark:text-slate-400 text-center">
-                          No vendors found
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Notes
-                  </label>
-                  <input
-                    name="Column1"
-                    value={form.Column1 || ""}
-                    onChange={handleChange}
-                    placeholder="Additional notes"
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                {/* Action Button */}
-                <div className="flex gap-3 pt-4">
-                  {editSrNo ? (
-                    <button
-                      onClick={updateItem}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Update Item
-                    </button>
-                  ) : (
-                    <button
-                      onClick={createItem}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      Add Single Item
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
 
             {/* Multiple Items Form - Similar fixes applied */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
@@ -1057,6 +842,264 @@ export default function Home() {
                 </button>
               </div>
             </div>
+
+            {/* Single Item Form */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
+                  {editSrNo ? "Edit Item" : "Add Single Item"}
+                </h2>
+                {editSrNo && (
+                  <button
+                    onClick={resetForm}
+                    className="px-3 py-1 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white border border-slate-300 dark:border-slate-600 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                {/* Location */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Location *
+                  </label>
+                  <input
+                    name="Location"
+                    value={form.Location || ""}
+                    onChange={handleChange}
+                    placeholder="Enter location"
+                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                {/* Product Selection with Search */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Product *
+                  </label>
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => {
+                      setProductSearch(e.target.value);
+                      setShowProductDropdown(true);
+                    }}
+                    onFocus={() => setShowProductDropdown(true)}
+                    placeholder="Search or select product"
+                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+
+                  {showProductDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredProducts.map((product) => (
+                        <div
+                          key={product["Product ID"]}
+                          onClick={() => handleProductSelect(product["Product ID"], product.Product)}
+                          className="p-3 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer border-b border-slate-200 dark:border-slate-600 last:border-b-0"
+                        >
+                          <div className="font-medium text-slate-900 dark:text-white">
+                            {product.Product}
+                          </div>
+                          <div className="text-sm text-slate-500 dark:text-slate-400">
+                            {product["Product ID"]}
+                          </div>
+                        </div>
+                      ))}
+                      {filteredProducts.length === 0 && (
+                        <div className="p-3 text-slate-500 dark:text-slate-400 text-center">
+                          No products found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Batch Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Batch No *
+                  </label>
+                  <select
+                    name="Batch_no"
+                    value={form.Batch_no || ""}
+                    onChange={(e) => handleBatchSelect(e.target.value)}
+                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    disabled={batchLoading || !form.product_id}
+                  >
+                    <option value="">
+                      {batchLoading ? "Loading batches..." : !form.product_id ? "Select product first" : "Select Batch"}
+                    </option>
+                    {batchList.map((b, i) => {
+                      const batchKey = b.dATA_ID || b.Batch;
+                      const displayName = b.dATA_ID ? `BATCH_${b.dATA_ID}` : b.Batch;
+                      return (
+                        <option key={i} value={batchKey}>
+                          {displayName} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Input Grid - Changed expiryDate to text type */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Quantity *
+                    </label>
+                    <input
+                      type="number"
+                      name="Quantity"
+                      value={form.Quantity || ""}
+                      onChange={handleChange}
+                      placeholder="Quantity"
+                      className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Expiry Date
+                    </label>
+                    <input
+                      type="text"
+                      name="expiryDate"
+                      value={form.expiryDate || ""}
+                      onChange={handleChange}
+                      placeholder="Expiry Date"
+                      className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      MRP
+                    </label>
+                    <input
+                      type="number"
+                      name="MRP"
+                      value={form.MRP || ""}
+                      onChange={handleChange}
+                      placeholder="MRP"
+                      className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Unit Price
+                    </label>
+                    <input
+                      type="number"
+                      name="Unit_Price"
+                      value={form.Unit_Price || ""}
+                      onChange={handleChange}
+                      placeholder="Unit Price"
+                      className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Vendor Selection with Search */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Vendor *
+                  </label>
+                  <input
+                    type="text"
+                    value={vendorSearch}
+                    onChange={(e) => {
+                      setVendorSearch(e.target.value);
+                      setShowVendorDropdown(true);
+                    }}
+                    onFocus={() => setShowVendorDropdown(true)}
+                    placeholder="Search or select vendor"
+                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+
+                  {showVendorDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredVendors.map((vendor) => (
+                        <div
+                          key={vendor._id}
+                          onClick={() => handleVendorSelect(vendor._id, vendor.partyName)}
+                          className="p-3 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer border-b border-slate-200 dark:border-slate-600 last:border-b-0"
+                        >
+                          <div className="font-medium text-slate-900 dark:text-white">
+                            {vendor.partyName}
+                          </div>
+                        </div>
+                      ))}
+                      {filteredVendors.length === 0 && (
+                        <div className="p-3 text-slate-500 dark:text-slate-400 text-center">
+                          No vendors found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Notes
+                  </label>
+                  <input
+                    name="Column1"
+                    value={form.Column1 || ""}
+                    onChange={handleChange}
+                    placeholder="Additional notes"
+                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                {/* Action Button */}
+                <div className="flex gap-3 pt-4">
+                  {editSrNo ? (
+                    <button
+                      onClick={updateItem}
+                      disabled={apiCalledsingle}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      {apiCalledsingle ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Update Item
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={createItem}
+                      disabled={apiCalledsingle}
+                      className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      {apiCalledsingle ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Add Single Item
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+
           </div>
 
           {/* Table Section */}
@@ -1106,7 +1149,7 @@ export default function Home() {
                   </div>
                 ) : (
                   <table className="w-full">
-                    <thead className="bg-slate-50 dark:bg-slate-700/50 sticky top-0">
+                    <thead className="bg-slate-50 dark:bg-slate-700 sticky top-0">
                       <tr>
                         {["srNo", "Product", "Batch", "Qty", "Location", "Expiry", "MRP", "Price", "Vendor", "Actions"].map((h) => (
                           <th
@@ -1141,7 +1184,7 @@ export default function Home() {
                           <td className="px-4 py-3 text-sm text-slate-900 dark:text-white">
                             {item.Quantity}
                           </td>
-                          <td className="px-4 py-3 text-sm text-slate-900 dark:text-white">
+                          <td className="px-4 py-3 text-sm text-slate-900 dark:text-white max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap" title={item.Location}>
                             {item.Location}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-900 dark:text-white">
