@@ -26,6 +26,42 @@ export default function Home() {
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
 
+  // Add this state
+  const [viewMode, setViewMode] = useState("normal"); // "normal", "location", "product"
+
+
+  // Product-wise view: Group by product, then batch, then location
+  const productViewData = items.reduce((acc, item) => {
+    const productKey = `${item.product_id}-${item.product_name}`;
+    const batchKey = item.Batch_no || "No Batch";
+    const location = item.Location || "Unknown Location";
+
+    if (!acc[productKey]) {
+      acc[productKey] = {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        batches: {}
+      };
+    }
+
+    if (!acc[productKey].batches[batchKey]) {
+      acc[productKey].batches[batchKey] = {
+        batch_no: batchKey,
+        locations: {},
+        total_quantity: 0
+      };
+    }
+
+    if (!acc[productKey].batches[batchKey].locations[location]) {
+      acc[productKey].batches[batchKey].locations[location] = 0;
+    }
+
+    acc[productKey].batches[batchKey].locations[location] += Number(item.Quantity) || 0;
+    acc[productKey].batches[batchKey].total_quantity += Number(item.Quantity) || 0;
+
+    return acc;
+  }, {});
+
   // FORM DATA
   const [form, setForm] = useState({
     product_id: "",
@@ -700,7 +736,7 @@ export default function Home() {
                       const displayName = b.dATA_ID ? `BATCH_${b.dATA_ID}` : b.Batch;
                       return (
                         <option key={i} value={batchKey}>
-                          {displayName} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                          {b.Batch} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
                         </option>
                       );
                     })}
@@ -936,7 +972,7 @@ export default function Home() {
                       const displayName = b.dATA_ID ? `BATCH_${b.dATA_ID}` : b.Batch;
                       return (
                         <option key={i} value={batchKey}>
-                          {displayName} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                          {b.Batch} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
                         </option>
                       );
                     })}
@@ -1098,7 +1134,6 @@ export default function Home() {
                 </div>
               </div>
             </div>
-
 
           </div>
 
