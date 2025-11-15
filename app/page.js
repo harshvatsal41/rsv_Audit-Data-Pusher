@@ -739,7 +739,7 @@ export default function Home() {
                       {batchLoading ? "Loading..." : !currentMultipleItem.product_id ? "Select product" : "Select Batch"}
                     </option>
                     {batchList.map((b, i) => {
-                      const batchKey = b.dATA_ID || b.Batch;
+                      const batchKey =  b.Batch;
                       const displayName = b.dATA_ID ? `BATCH_${b.dATA_ID}` : b.Batch;
                       return (
                         <option key={i} value={batchKey}>
@@ -975,7 +975,7 @@ export default function Home() {
                       {batchLoading ? "Loading batches..." : !form.product_id ? "Select product first" : "Select Batch"}
                     </option>
                     {batchList.map((b, i) => {
-                      const batchKey = b.dATA_ID || b.Batch;
+                      const batchKey =  b.Batch;
                       const displayName = b.dATA_ID ? `BATCH_${b.dATA_ID}` : b.Batch;
                       return (
                         <option key={i} value={batchKey}>
