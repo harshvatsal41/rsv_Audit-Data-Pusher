@@ -662,6 +662,13 @@ export default function Home() {
                 Add Multiple Items
               </h2>
 
+              <button
+                onClick={fetchProductsAndBatches}
+                className="inline-flex items-center px-2 py-1 text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+              >
+                Fetch Products and Batches
+              </button>
+
               <div className="space-y-4">
                 {/* Common Location */}
                 <div>
