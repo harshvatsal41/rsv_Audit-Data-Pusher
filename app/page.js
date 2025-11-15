@@ -26,41 +26,13 @@ export default function Home() {
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
 
-  // Add this state
-  const [viewMode, setViewMode] = useState("normal"); // "normal", "location", "product"
+  // Manual entry states
+  const [manualBatch, setManualBatch] = useState(false);
+  const [manualProduct, setManualProduct] = useState(false);
+  const [manualVendor, setManualVendor] = useState(false);
 
-
-  // Product-wise view: Group by product, then batch, then location
-  const productViewData = items.reduce((acc, item) => {
-    const productKey = `${item.product_id}-${item.product_name}`;
-    const batchKey = item.Batch_no || "No Batch";
-    const location = item.Location || "Unknown Location";
-
-    if (!acc[productKey]) {
-      acc[productKey] = {
-        product_id: item.product_id,
-        product_name: item.product_name,
-        batches: {}
-      };
-    }
-
-    if (!acc[productKey].batches[batchKey]) {
-      acc[productKey].batches[batchKey] = {
-        batch_no: batchKey,
-        locations: {},
-        total_quantity: 0
-      };
-    }
-
-    if (!acc[productKey].batches[batchKey].locations[location]) {
-      acc[productKey].batches[batchKey].locations[location] = 0;
-    }
-
-    acc[productKey].batches[batchKey].locations[location] += Number(item.Quantity) || 0;
-    acc[productKey].batches[batchKey].total_quantity += Number(item.Quantity) || 0;
-
-    return acc;
-  }, {});
+  // Refresh state
+  const [refreshingBatches, setRefreshingBatches] = useState(false);
 
   // FORM DATA
   const [form, setForm] = useState({
@@ -146,6 +118,20 @@ export default function Home() {
     }
   };
 
+  // Refresh batches function
+  const refreshBatches = async () => {
+    try {
+      setRefreshingBatches(true);
+      await fetchProductsAndBatches();
+      alert("Batches refreshed successfully!");
+    } catch (error) {
+      console.error("Error refreshing batches:", error);
+      alert("Error refreshing batches. Please try again.");
+    } finally {
+      setRefreshingBatches(false);
+    }
+  };
+
   useEffect(() => {
     fetchItems();
     fetchParty();
@@ -187,29 +173,21 @@ export default function Home() {
       product_id,
       product_name: selectedProductName,
       Batch_no: "",
-      Quantity: "",
-      expiryDate: "",
-      MRP: "",
-      Unit_Price: "",
     }));
 
     setProductSearch(selectedProductName);
     setShowProductDropdown(false);
+    setManualProduct(false);
 
     // Filter batches from pre-loaded allBatches
     const batches = allBatches.filter((b) => b["Product ID"] === product_id);
-
-    console.log("Filtered batches for product:", batches);
-
-    // Since all batches have "0" as batch number, use dATA_ID as unique identifier
     const batchMap = new Map();
     batches.forEach(batch => {
-      const batchKey = batch.dATA_ID || batch.Batch;
+      const batchKey = batch.Batch || `BATCH_${batch.dATA_ID}`;
       if (!batchMap.has(batchKey)) {
         batchMap.set(batchKey, batch);
       }
     });
-
     setBatchList(Array.from(batchMap.values()));
   };
 
@@ -222,33 +200,26 @@ export default function Home() {
       product_id,
       product_name: selectedProductName,
       Batch_no: "",
-      Quantity: "",
-      expiryDate: "",
-      MRP: "",
-      Unit_Price: "",
-      vendor_id: "",
-      vendor_name: "",
     }));
 
     setProductSearch(selectedProductName);
     setShowProductDropdown(false);
+    setManualProduct(false);
 
     // Filter batches from pre-loaded allBatches
     const batches = allBatches.filter((b) => b["Product ID"] === product_id);
-
     const batchMap = new Map();
     batches.forEach(batch => {
-      const batchKey = batch.dATA_ID || batch.Batch;
+      const batchKey = batch.Batch || `BATCH_${batch.dATA_ID}`;
       if (!batchMap.has(batchKey)) {
         batchMap.set(batchKey, batch);
       }
     });
-
     setBatchList(Array.from(batchMap.values()));
   };
 
   /* ------------------------------------------------------------
-     SELECT BATCH → AUTO FILL DETAILS
+     SELECT BATCH → AUTO FILL DETAILS (FIXED LOGIC)
   ------------------------------------------------------------ */
   const handleBatchSelect = (batch_key) => {
     if (!batch_key) {
@@ -262,10 +233,11 @@ export default function Home() {
       return;
     }
 
-    // Find batch by dATA_ID (if provided) or by Batch field
-    const batch = batchList.find((b) =>
-      (b.dATA_ID && b.dATA_ID.toString() === batch_key) || b.Batch === batch_key
-    );
+    // Find batch by Batch field (using the actual batch string)
+    const batch = batchList.find((b) => {
+      const batchKey = b.Batch || `BATCH_${b.dATA_ID}`;
+      return batchKey === batch_key;
+    });
 
     console.log("Selected batch details:", batch);
 
@@ -282,7 +254,7 @@ export default function Home() {
 
     setForm((p) => ({
       ...p,
-      Batch_no: batch.dATA_ID ? `BATCH_${batch.dATA_ID}` : batch.Batch,
+      Batch_no: batch.Batch || `BATCH_${batch.dATA_ID}`,
       Quantity: batch.Quantity || batch["Current Stock"] || "",
       expiryDate: batch["Expiry Date"] || batch.Expiry || "",
       MRP: batch.MRP || "",
@@ -302,11 +274,10 @@ export default function Home() {
       return;
     }
 
-    const batch = batchList.find((b) =>
-      (b.dATA_ID && b.dATA_ID.toString() === batch_key) || b.Batch === batch_key
-    );
-
-    console.log("Selected multiple batch details:", batch);
+    const batch = batchList.find((b) => {
+      const batchKey = b.Batch || `BATCH_${b.dATA_ID}`;
+      return batchKey === batch_key;
+    });
 
     if (!batch) {
       setCurrentMultipleItem((p) => ({
@@ -321,12 +292,83 @@ export default function Home() {
 
     setCurrentMultipleItem((p) => ({
       ...p,
-      Batch_no: batch.dATA_ID ? `BATCH_${batch.dATA_ID}` : batch.Batch,
+      Batch_no: batch.Batch || `BATCH_${batch.dATA_ID}`,
       Quantity: batch.Quantity || batch["Current Stock"] || "",
       expiryDate: batch["Expiry Date"] || batch.Expiry || "",
       MRP: batch.MRP || "",
       Unit_Price: batch.Cost || batch["Unit Cost"] || "",
     }));
+  };
+
+  /* ------------------------------------------------------------
+     MANUAL ENTRY HANDLERS
+  ------------------------------------------------------------ */
+  const handleManualProductEntry = () => {
+    setManualProduct(true);
+    setForm((p) => ({
+      ...p,
+      product_id: "MANUAL",
+      product_name: "",
+    }));
+    setProductSearch("");
+    setShowProductDropdown(false);
+  };
+
+  const handleManualMultipleProductEntry = () => {
+    setManualProduct(true);
+    setCurrentMultipleItem((p) => ({
+      ...p,
+      product_id: "MANUAL",
+      product_name: "",
+    }));
+    setProductSearch("");
+    setShowProductDropdown(false);
+  };
+
+  const handleManualBatchEntry = () => {
+    setManualBatch(true);
+    setForm((p) => ({
+      ...p,
+      Batch_no: "",
+      Quantity: "",
+      expiryDate: "",
+      MRP: "",
+      Unit_Price: "",
+    }));
+  };
+
+  const handleManualMultipleBatchEntry = () => {
+    setManualBatch(true);
+    setCurrentMultipleItem((p) => ({
+      ...p,
+      Batch_no: "",
+      Quantity: "",
+      expiryDate: "",
+      MRP: "",
+      Unit_Price: "",
+    }));
+  };
+
+  const handleManualVendorEntry = () => {
+    setManualVendor(true);
+    setForm((p) => ({
+      ...p,
+      vendor_id: "MANUAL",
+      vendor_name: "",
+    }));
+    setVendorSearch("");
+    setShowVendorDropdown(false);
+  };
+
+  const handleManualMultipleVendorEntry = () => {
+    setManualVendor(true);
+    setCurrentMultipleItem((p) => ({
+      ...p,
+      vendor_id: "MANUAL",
+      vendor_name: "",
+    }));
+    setVendorSearch("");
+    setShowVendorDropdown(false);
   };
 
   /* ------------------------------------------------------------
@@ -344,6 +386,7 @@ export default function Home() {
 
     setVendorSearch(selectedVendorName);
     setShowVendorDropdown(false);
+    setManualVendor(false);
   };
 
   const handleMultipleVendorSelect = (vendor_id, vendor_name = "") => {
@@ -358,6 +401,7 @@ export default function Home() {
 
     setVendorSearch(selectedVendorName);
     setShowVendorDropdown(false);
+    setManualVendor(false);
   };
 
   /* ------------------------------------------------------------
@@ -398,7 +442,6 @@ export default function Home() {
      CREATE MULTIPLE ITEMS
   ------------------------------------------------------------ */
   const createMultipleItems = async () => {
-    // Set apiCalled to true at the start
     setApiCalled(true);
 
     console.log("Multiple items to create:", multipleItems);
@@ -442,7 +485,6 @@ export default function Home() {
       console.error("Error creating multiple items:", error);
       alert("Error creating multiple items. Please try again.");
     } finally {
-      // Always reset apiCalled whether success or failure
       setApiCalled(false);
     }
   };
@@ -476,6 +518,8 @@ export default function Home() {
     }));
 
     setBatchList([]);
+    setManualBatch(false);
+    setManualProduct(false);
 
     setProductSearch("");
     setVendorSearch("");
@@ -496,13 +540,12 @@ export default function Home() {
   const updateItem = async () => {
     setApiCalledsingle(true);
 
-    // Add validation for update as well
     const requiredFields = ['product_id', 'Batch_no', 'Quantity', 'Location', 'vendor_id'];
     const missingFields = requiredFields.filter(field => !form[field]);
 
     if (missingFields.length > 0) {
       alert(`Please fill in all required fields: ${missingFields.join(', ')}`);
-      setApiCalledsingle(false); // Reset if validation fails
+      setApiCalledsingle(false);
       return;
     }
 
@@ -544,14 +587,13 @@ export default function Home() {
   };
 
   /* ------------------------------------------------------------
-     LOAD FOR EDIT (FIXED TO LOAD ALL DATA PROPERLY)
+     LOAD FOR EDIT
   ------------------------------------------------------------ */
   const loadForEdit = (item) => {
     console.log("Loading for edit:", item);
 
     setEditSrNo(item.srNo);
 
-    // Set all form fields from the item
     setForm({
       product_id: item.product_id || "",
       product_name: item.product_name || "",
@@ -566,16 +608,15 @@ export default function Home() {
       vendor_name: item.vendor_name || "",
     });
 
-    // Set search values for dropdowns
     setProductSearch(item.product_name || "");
     setVendorSearch(item.vendor_name || "");
 
     // Load batches for the product
-    if (item.product_id) {
+    if (item.product_id && item.product_id !== "MANUAL") {
       const batches = allBatches.filter((b) => b["Product ID"] === item.product_id);
       const batchMap = new Map();
       batches.forEach(batch => {
-        const batchKey = batch.dATA_ID || batch.Batch;
+        const batchKey = batch.Batch || `BATCH_${batch.dATA_ID}`;
         if (!batchMap.has(batchKey)) {
           batchMap.set(batchKey, batch);
         }
@@ -607,6 +648,9 @@ export default function Home() {
     setVendorSearch("");
     setShowProductDropdown(false);
     setShowVendorDropdown(false);
+    setManualBatch(false);
+    setManualProduct(false);
+    setManualVendor(false);
   };
 
   const resetMultipleItems = () => {
@@ -626,6 +670,9 @@ export default function Home() {
     setBatchList([]);
     setProductSearch("");
     setVendorSearch("");
+    setManualBatch(false);
+    setManualProduct(false);
+    setManualVendor(false);
   };
 
   /* ------------------------------------------------------------
@@ -654,20 +701,32 @@ export default function Home() {
           {/* Form Section */}
           <div className="lg:col-span-1 space-y-6">
 
-
-
-            {/* Multiple Items Form - Similar fixes applied */}
+            {/* Multiple Items Form */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-4">
-                Add Multiple Items
-              </h2>
-
-              <button
-                onClick={fetchProductsAndBatches}
-                className="inline-flex items-center px-2 py-1 text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-              >
-                Fetch Products and Batches
-              </button>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
+                  Add Multiple Items
+                </h2>
+                <button
+                  onClick={refreshBatches}
+                  disabled={refreshingBatches}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg font-medium transition-colors text-sm"
+                >
+                  {refreshingBatches ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Refreshing...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh Batches
+                    </>
+                  )}
+                </button>
+              </div>
 
               <div className="space-y-4">
                 {/* Common Location */}
@@ -690,19 +749,57 @@ export default function Home() {
 
                   {/* Product with Search */}
                   <div className="relative">
-                    <input
-                      type="text"
-                      value={productSearch}
-                      onChange={(e) => {
-                        setProductSearch(e.target.value);
-                        setShowProductDropdown(true);
-                      }}
-                      onFocus={() => setShowProductDropdown(true)}
-                      placeholder="Search or select product"
-                      className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Product *
+                    </label>
+                    {manualProduct ? (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          name="product_name"
+                          value={currentMultipleItem.product_name || ""}
+                          onChange={handleMultipleItemChange}
+                          placeholder="Enter product name"
+                          className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                        <input
+                          type="text"
+                          name="product_id"
+                          value={currentMultipleItem.product_id || ""}
+                          onChange={handleMultipleItemChange}
+                          placeholder="Enter product ID"
+                          className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                        <button
+                          onClick={() => setManualProduct(false)}
+                          className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                        >
+                          ← Select from list
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={productSearch}
+                          onChange={(e) => {
+                            setProductSearch(e.target.value);
+                            setShowProductDropdown(true);
+                          }}
+                          onFocus={() => setShowProductDropdown(true)}
+                          placeholder="Search or select product"
+                          className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                        <button
+                          onClick={handleManualMultipleProductEntry}
+                          className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                        >
+                          + Add product manually
+                        </button>
+                      </div>
+                    )}
 
-                    {showProductDropdown && (
+                    {showProductDropdown && !manualProduct && (
                       <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                         {filteredProducts.map((product) => (
                           <div
@@ -727,54 +824,121 @@ export default function Home() {
                     )}
                   </div>
 
-                  {/* Batch Selection */}
-                  <select
-                    name="Batch_no"
-                    value={currentMultipleItem.Batch_no || ""}
-                    onChange={(e) => handleMultipleBatchSelect(e.target.value)}
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    disabled={batchLoading || !currentMultipleItem.product_id}
-                  >
-                    <option value="">
-                      {batchLoading ? "Loading..." : !currentMultipleItem.product_id ? "Select product" : "Select Batch"}
-                    </option>
-                    {batchList.map((b, i) => {
-                      const batchKey =  b.Batch;
-                      const displayName = b.dATA_ID ? `BATCH_${b.dATA_ID}` : b.Batch;
-                      return (
-                        <option key={i} value={batchKey}>
-                          {b.Batch} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  {/* Batch Selection - FIXED */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Batch No *
+                    </label>
+                    {manualBatch ? (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          name="Batch_no"
+                          value={currentMultipleItem.Batch_no || ""}
+                          onChange={handleMultipleItemChange}
+                          placeholder="Enter batch number"
+                          className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                        <button
+                          onClick={() => setManualBatch(false)}
+                          className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                        >
+                          ← Select from list
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <select
+                          name="Batch_no"
+                          value={currentMultipleItem.Batch_no || ""}
+                          onChange={(e) => {
+                            if (e.target.value === "manual") {
+                              handleManualMultipleBatchEntry();
+                            } else {
+                              handleMultipleBatchSelect(e.target.value);
+                            }
+                          }}
+                          className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          disabled={batchLoading || !currentMultipleItem.product_id}
+                        >
+                          <option value="">
+                            {batchLoading ? "Loading..." : !currentMultipleItem.product_id ? "Select product first" : "Select Batch"}
+                          </option>
+                          {batchList.map((b, i) => {
+                            const batchKey = b.Batch || `BATCH_${b.dATA_ID}`;
+                            return (
+                              <option key={i} value={batchKey}>
+                                {batchKey} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                              </option>
+                            );
+                          })}
+                          <option value="manual">+ Add batch manually</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Quantity and Vendor */}
                   <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="number"
-                      name="Quantity"
-                      value={currentMultipleItem.Quantity || ""}
-                      onChange={handleMultipleItemChange}
-                      placeholder="Quantity *"
-                      className="p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Quantity *
+                      </label>
+                      <input
+                        type="number"
+                        name="Quantity"
+                        value={currentMultipleItem.Quantity || ""}
+                        onChange={handleMultipleItemChange}
+                        placeholder="Quantity"
+                        className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                    </div>
 
                     {/* Vendor with Search */}
                     <div className="relative">
-                      <input
-                        type="text"
-                        value={vendorSearch}
-                        onChange={(e) => {
-                          setVendorSearch(e.target.value);
-                          setShowVendorDropdown(true);
-                        }}
-                        onFocus={() => setShowVendorDropdown(true)}
-                        placeholder="Search vendor"
-                        className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      />
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Vendor *
+                      </label>
+                      {manualVendor ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            name="vendor_name"
+                            value={currentMultipleItem.vendor_name || ""}
+                            onChange={handleMultipleItemChange}
+                            placeholder="Enter vendor name"
+                            className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          />
+                          <button
+                            onClick={() => setManualVendor(false)}
+                            className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                          >
+                            ← Select from list
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={vendorSearch}
+                            onChange={(e) => {
+                              setVendorSearch(e.target.value);
+                              setShowVendorDropdown(true);
+                            }}
+                            onFocus={() => setShowVendorDropdown(true)}
+                            placeholder="Search vendor"
+                            className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          />
+                          <button
+                            onClick={handleManualMultipleVendorEntry}
+                            className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                          >
+                            + Add vendor manually
+                          </button>
+                        </div>
+                      )}
 
-                      {showVendorDropdown && (
+                      {showVendorDropdown && !manualVendor && (
                         <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {filteredVendors.map((vendor) => (
                             <div
@@ -886,7 +1050,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Single Item Form */}
+            {/* Single Item Form - Similar fixes applied */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
@@ -922,19 +1086,54 @@ export default function Home() {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Product *
                   </label>
-                  <input
-                    type="text"
-                    value={productSearch}
-                    onChange={(e) => {
-                      setProductSearch(e.target.value);
-                      setShowProductDropdown(true);
-                    }}
-                    onFocus={() => setShowProductDropdown(true)}
-                    placeholder="Search or select product"
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
+                  {manualProduct ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        name="product_name"
+                        value={form.product_name || ""}
+                        onChange={handleChange}
+                        placeholder="Enter product name"
+                        className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      <input
+                        type="text"
+                        name="product_id"
+                        value={form.product_id || ""}
+                        onChange={handleChange}
+                        placeholder="Enter product ID"
+                        className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      <button
+                        onClick={() => setManualProduct(false)}
+                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                      >
+                        ← Select from list
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={productSearch}
+                        onChange={(e) => {
+                          setProductSearch(e.target.value);
+                          setShowProductDropdown(true);
+                        }}
+                        onFocus={() => setShowProductDropdown(true)}
+                        placeholder="Search or select product"
+                        className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      <button
+                        onClick={handleManualProductEntry}
+                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                      >
+                        + Add product manually
+                      </button>
+                    </div>
+                  )}
 
-                  {showProductDropdown && (
+                  {showProductDropdown && !manualProduct && (
                     <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {filteredProducts.map((product) => (
                         <div
@@ -959,34 +1158,61 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Batch Selection */}
+                {/* Batch Selection - FIXED */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Batch No *
                   </label>
-                  <select
-                    name="Batch_no"
-                    value={form.Batch_no || ""}
-                    onChange={(e) => handleBatchSelect(e.target.value)}
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    disabled={batchLoading || !form.product_id}
-                  >
-                    <option value="">
-                      {batchLoading ? "Loading batches..." : !form.product_id ? "Select product first" : "Select Batch"}
-                    </option>
-                    {batchList.map((b, i) => {
-                      const batchKey =  b.Batch;
-                      const displayName = b.dATA_ID ? `BATCH_${b.dATA_ID}` : b.Batch;
-                      return (
-                        <option key={i} value={batchKey}>
-                          {b.Batch} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                  {manualBatch ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        name="Batch_no"
+                        value={form.Batch_no || ""}
+                        onChange={handleChange}
+                        placeholder="Enter batch number"
+                        className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      <button
+                        onClick={() => setManualBatch(false)}
+                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                      >
+                        ← Select from list
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <select
+                        name="Batch_no"
+                        value={form.Batch_no || ""}
+                        onChange={(e) => {
+                          if (e.target.value === "manual") {
+                            handleManualBatchEntry();
+                          } else {
+                            handleBatchSelect(e.target.value);
+                          }
+                        }}
+                        className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        disabled={batchLoading || !form.product_id}
+                      >
+                        <option value="">
+                          {batchLoading ? "Loading batches..." : !form.product_id ? "Select product first" : "Select Batch"}
                         </option>
-                      );
-                    })}
-                  </select>
+                        {batchList.map((b, i) => {
+                          const batchKey = b.Batch || `BATCH_${b.dATA_ID}`;
+                          return (
+                            <option key={i} value={batchKey}>
+                              {batchKey} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                            </option>
+                          );
+                        })}
+                        <option value="manual">+ Add batch manually</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
-                {/* Input Grid - Changed expiryDate to text type */}
+                {/* Input Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -1047,19 +1273,46 @@ export default function Home() {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Vendor *
                   </label>
-                  <input
-                    type="text"
-                    value={vendorSearch}
-                    onChange={(e) => {
-                      setVendorSearch(e.target.value);
-                      setShowVendorDropdown(true);
-                    }}
-                    onFocus={() => setShowVendorDropdown(true)}
-                    placeholder="Search or select vendor"
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
+                  {manualVendor ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        name="vendor_name"
+                        value={form.vendor_name || ""}
+                        onChange={handleChange}
+                        placeholder="Enter vendor name"
+                        className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      <button
+                        onClick={() => setManualVendor(false)}
+                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                      >
+                        ← Select from list
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={vendorSearch}
+                        onChange={(e) => {
+                          setVendorSearch(e.target.value);
+                          setShowVendorDropdown(true);
+                        }}
+                        onFocus={() => setShowVendorDropdown(true)}
+                        placeholder="Search or select vendor"
+                        className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      <button
+                        onClick={handleManualVendorEntry}
+                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                      >
+                        + Add vendor manually
+                      </button>
+                    </div>
+                  )}
 
-                  {showVendorDropdown && (
+                  {showVendorDropdown && !manualVendor && (
                     <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {filteredVendors.map((vendor) => (
                         <div
@@ -1144,7 +1397,7 @@ export default function Home() {
 
           </div>
 
-          {/* Table Section */}
+          {/* Table Section - remains the same */}
           <div className="lg:col-span-2">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
               {/* Table Header */}
