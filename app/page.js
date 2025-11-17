@@ -173,6 +173,10 @@ export default function Home() {
       product_id,
       product_name: selectedProductName,
       Batch_no: "",
+      Quantity: "",
+      expiryDate: "",
+      MRP: "",
+      Unit_Price: "",
     }));
 
     setProductSearch(selectedProductName);
@@ -200,6 +204,10 @@ export default function Home() {
       product_id,
       product_name: selectedProductName,
       Batch_no: "",
+      Quantity: "",
+      expiryDate: "",
+      MRP: "",
+      Unit_Price: "",
     }));
 
     setProductSearch(selectedProductName);
@@ -219,10 +227,12 @@ export default function Home() {
   };
 
   /* ------------------------------------------------------------
-     SELECT BATCH → AUTO FILL DETAILS (FIXED LOGIC)
+     SELECT BATCH → AUTO FILL DETAILS (FIXED VERSION)
   ------------------------------------------------------------ */
-  const handleBatchSelect = (batch_key) => {
-    if (!batch_key) {
+  const handleBatchSelect = (batchId) => {
+    console.log("Selected batch id (single):", batchId);
+    
+    if (!batchId || batchId === "manual") {
       setForm((p) => ({
         ...p,
         Quantity: "",
@@ -233,15 +243,13 @@ export default function Home() {
       return;
     }
 
-    // Find batch by Batch field (using the actual batch string)
-    const batch = batchList.find((b) => {
-      const batchKey = b.Batch || `BATCH_${b.dATA_ID}`;
-      return batchKey === batch_key;
-    });
+    // Find batch by dATA_ID only
+    const batch = batchList.find((b) => String(b.dATA_ID) === String(batchId));
 
-    console.log("Selected batch details:", batch);
+    console.log("Found batch (single):", batch);
 
     if (!batch) {
+      console.log("No batch found for id:", batchId);
       setForm((p) => ({
         ...p,
         Quantity: "",
@@ -251,19 +259,24 @@ export default function Home() {
       }));
       return;
     }
+
+    // Format date properly to prevent any parsing issues
+    let expiryDate = batch["Expiry Date"] || batch.Expiry || "";
 
     setForm((p) => ({
       ...p,
-      Batch_no: batch.Batch || `BATCH_${batch.dATA_ID}`,
-      Quantity: batch.Quantity || batch["Current Stock"] || "",
-      expiryDate: batch["Expiry Date"] || batch.Expiry || "",
-      MRP: batch.MRP || "",
-      Unit_Price: batch.Cost || batch["Unit Cost"] || "",
+      Batch_no: `BATCH_${batch.dATA_ID}`,
+      Quantity: batch.Quantity || batch["Current Stock"] || batch.quantity || "",
+      expiryDate: expiryDate,
+      MRP: batch.MRP || batch.mrp || "",
+      Unit_Price: batch.Cost || batch["Unit Cost"] || batch.cost || "",
     }));
   };
 
-  const handleMultipleBatchSelect = (batch_key) => {
-    if (!batch_key) {
+  const handleMultipleBatchSelect = (batchId) => {
+    console.log("Multiple selected batch id:", batchId);
+    
+    if (!batchId || batchId === "manual") {
       setCurrentMultipleItem((p) => ({
         ...p,
         Quantity: "",
@@ -274,10 +287,10 @@ export default function Home() {
       return;
     }
 
-    const batch = batchList.find((b) => {
-      const batchKey = b.Batch || `BATCH_${b.dATA_ID}`;
-      return batchKey === batch_key;
-    });
+    // Find batch by dATA_ID only
+    const batch = batchList.find((b) => String(b.dATA_ID) === String(batchId));
+
+    console.log("Multiple found batch:", batch);
 
     if (!batch) {
       setCurrentMultipleItem((p) => ({
@@ -290,13 +303,16 @@ export default function Home() {
       return;
     }
 
+    // Format date properly
+    let expiryDate = batch["Expiry Date"] || batch.Expiry || "";
+
     setCurrentMultipleItem((p) => ({
       ...p,
-      Batch_no: batch.Batch || `BATCH_${batch.dATA_ID}`,
-      Quantity: batch.Quantity || batch["Current Stock"] || "",
-      expiryDate: batch["Expiry Date"] || batch.Expiry || "",
-      MRP: batch.MRP || "",
-      Unit_Price: batch.Cost || batch["Unit Cost"] || "",
+      Batch_no: `BATCH_${batch.dATA_ID}`,
+      Quantity: batch.Quantity || batch["Current Stock"] || batch.quantity || "",
+      expiryDate: expiryDate,
+      MRP: batch.MRP || batch.mrp || "",
+      Unit_Price: batch.Cost || batch["Unit Cost"] || batch.cost || "",
     }));
   };
 
@@ -312,6 +328,7 @@ export default function Home() {
     }));
     setProductSearch("");
     setShowProductDropdown(false);
+    setBatchList([]);
   };
 
   const handleManualMultipleProductEntry = () => {
@@ -323,6 +340,7 @@ export default function Home() {
     }));
     setProductSearch("");
     setShowProductDropdown(false);
+    setBatchList([]);
   };
 
   const handleManualBatchEntry = () => {
@@ -415,6 +433,7 @@ export default function Home() {
 
     if (missingFields.length > 0) {
       alert(`Please fill in all required fields: ${missingFields.join(', ')}`);
+      setApiCalledsingle(false);
       return;
     }
 
@@ -447,6 +466,7 @@ export default function Home() {
     console.log("Multiple items to create:", multipleItems);
     if (!form.Location || multipleItems.length === 0) {
       alert("Please set Location and add at least one item");
+      setApiCalled(false);
       return;
     }
 
@@ -457,6 +477,7 @@ export default function Home() {
 
     if (invalidItems.length > 0) {
       alert("Some items are missing required fields (Product, Batch, Quantity, or Vendor). Please check all items.");
+      setApiCalled(false);
       return;
     }
 
@@ -490,7 +511,7 @@ export default function Home() {
   };
 
   /* ------------------------------------------------------------
-     ADD ITEM TO MULTIPLE ITEMS LIST
+     ADD ITEM TO MULTIPLE ITEMS LIST - FIXED
   ------------------------------------------------------------ */
   const addToMultipleItems = () => {
     const requiredFields = ['product_id', 'Batch_no', 'Quantity', 'vendor_id'];
@@ -503,8 +524,11 @@ export default function Home() {
 
     setMultipleItems(prev => [...prev, { ...currentMultipleItem }]);
 
+    // Store vendor info before resetting
+    const currentVendorName = currentMultipleItem.vendor_name;
+
     // Reset current multiple item but keep vendor selection for convenience
-    setCurrentMultipleItem(prev => ({
+    setCurrentMultipleItem({
       product_id: "",
       product_name: "",
       Batch_no: "",
@@ -513,16 +537,16 @@ export default function Home() {
       MRP: "",
       Unit_Price: "",
       Column1: "",
-      vendor_id: prev.vendor_id,
-      vendor_name: prev.vendor_name,
-    }));
+      vendor_id: currentMultipleItem.vendor_id,
+      vendor_name: currentMultipleItem.vendor_name,
+    });
 
     setBatchList([]);
     setManualBatch(false);
     setManualProduct(false);
 
     setProductSearch("");
-    setVendorSearch("");
+    setVendorSearch(currentVendorName || "");
     setShowProductDropdown(false);
     setShowVendorDropdown(false);
   };
@@ -850,7 +874,11 @@ export default function Home() {
                       <div className="space-y-2">
                         <select
                           name="Batch_no"
-                          value={currentMultipleItem.Batch_no || ""}
+                          value={
+                            currentMultipleItem.Batch_no
+                              ? String(currentMultipleItem.Batch_no).replace(/^BATCH_/, "")
+                              : ""
+                          }
                           onChange={(e) => {
                             if (e.target.value === "manual") {
                               handleManualMultipleBatchEntry();
@@ -865,10 +893,9 @@ export default function Home() {
                             {batchLoading ? "Loading..." : !currentMultipleItem.product_id ? "Select product first" : "Select Batch"}
                           </option>
                           {batchList.map((b, i) => {
-                            const batchKey = b.Batch || `BATCH_${b.dATA_ID}`;
                             return (
-                              <option key={i} value={batchKey}>
-                                {batchKey} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                              <option key={i} value={b.dATA_ID}>
+                                {`BATCH_${b.dATA_ID}`} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
                               </option>
                             );
                           })}
@@ -964,7 +991,7 @@ export default function Home() {
                   {/* Additional Fields */}
                   <div className="grid grid-cols-2 gap-3">
                     <input
-                      type="text"
+                      type="date"
                       name="expiryDate"
                       value={currentMultipleItem.expiryDate || ""}
                       onChange={handleMultipleItemChange}
@@ -1050,7 +1077,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Single Item Form - Similar fixes applied */}
+            {/* Single Item Form */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
@@ -1184,7 +1211,9 @@ export default function Home() {
                     <div className="space-y-2">
                       <select
                         name="Batch_no"
-                        value={form.Batch_no || ""}
+                        value={
+                          form.Batch_no ? String(form.Batch_no).replace(/^BATCH_/, "") : ""
+                        }
                         onChange={(e) => {
                           if (e.target.value === "manual") {
                             handleManualBatchEntry();
@@ -1199,10 +1228,9 @@ export default function Home() {
                           {batchLoading ? "Loading batches..." : !form.product_id ? "Select product first" : "Select Batch"}
                         </option>
                         {batchList.map((b, i) => {
-                          const batchKey = b.Batch || `BATCH_${b.dATA_ID}`;
                           return (
-                            <option key={i} value={batchKey}>
-                              {batchKey} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                            <option key={i} value={b.dATA_ID}>
+                              {`BATCH_${b.dATA_ID}`} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
                             </option>
                           );
                         })}
@@ -1232,7 +1260,7 @@ export default function Home() {
                       Expiry Date
                     </label>
                     <input
-                      type="text"
+                      type="date"
                       name="expiryDate"
                       value={form.expiryDate || ""}
                       onChange={handleChange}
@@ -1397,7 +1425,7 @@ export default function Home() {
 
           </div>
 
-          {/* Table Section - remains the same */}
+          {/* Table Section */}
           <div className="lg:col-span-2">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
               {/* Table Header */}
