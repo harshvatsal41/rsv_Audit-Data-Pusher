@@ -895,7 +895,7 @@ export default function Home() {
                           {batchList.map((b, i) => {
                             return (
                               <option key={i} value={b.dATA_ID}>
-                                {`BATCH_${b.dATA_ID}`} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                                {`${b.Batch}`} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
                               </option>
                             );
                           })}
@@ -1230,7 +1230,7 @@ export default function Home() {
                         {batchList.map((b, i) => {
                           return (
                             <option key={i} value={b.dATA_ID}>
-                              {`BATCH_${b.dATA_ID}`} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
+                              {`BATCH_${b.Batch}`} {b.Quantity ? `(Qty: ${b.Quantity})` : ''}
                             </option>
                           );
                         })}
