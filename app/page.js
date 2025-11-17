@@ -991,7 +991,7 @@ export default function Home() {
                   {/* Additional Fields */}
                   <div className="grid grid-cols-2 gap-3">
                     <input
-                      type="date"
+                      type="text"
                       name="expiryDate"
                       value={currentMultipleItem.expiryDate || ""}
                       onChange={handleMultipleItemChange}
@@ -1260,7 +1260,7 @@ export default function Home() {
                       Expiry Date
                     </label>
                     <input
-                      type="date"
+                      type="text"
                       name="expiryDate"
                       value={form.expiryDate || ""}
                       onChange={handleChange}
