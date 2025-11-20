@@ -832,7 +832,7 @@ export default function Home() {
                             className="p-3 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer border-b border-slate-200 dark:border-slate-600 last:border-b-0"
                           >
                             <div className="font-medium text-slate-900 dark:text-white">
-                              {product.Product}
+                              {"( " + product.Packing +" ) "+product.Product }
                             </div>
                             <div className="text-sm text-slate-500 dark:text-slate-400">
                               {product["Product ID"]}
